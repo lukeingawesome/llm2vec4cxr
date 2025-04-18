@@ -152,6 +152,7 @@ def main():
     # Print comparison results with pretty formatting
     print("\n" + "="*75)
     print("Similarity Score Comparison".center(75))
+    print(f"Original text: {report}")
     print("="*75)
     print("│" + "Option".center(35) + "│" + "LLM2Vec4CXR".center(18) + "│" + "Baseline".center(18) + "│")
     print("├" + "─"*35 + "┼" + "─"*18 + "┼" + "─"*18 + "┤")
