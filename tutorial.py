@@ -2,6 +2,7 @@ import torch
 import torch.nn.functional as F
 from llm2vec_wrapper import LLM2VecWrapper as LLM2Vec
 import os
+import argparse
 
 def load_model(model_path=None, model_dir=None):
     """
@@ -25,6 +26,23 @@ def load_model(model_path=None, model_dir=None):
         max_length=512,
         torch_dtype=torch.bfloat16,
     )
+
+    if model_path:
+        text_model = LLM2Vec.from_pretrained(
+            base_model_name_or_path='microsoft/LLM2CLIP-Llama-3.2-1B-Instruct-CC-Finetuned',
+            enable_bidirectional=True,
+            pooling_mode="latent_attention",
+            max_length=512,
+            torch_dtype=torch.bfloat16,
+            )
+    else:
+        text_model = LLM2Vec.from_pretrained(
+            base_model_name_or_path='microsoft/LLM2CLIP-Llama-3.2-1B-Instruct-CC-Finetuned',
+            enable_bidirectional=True,
+            pooling_mode="mean",
+            max_length=512,
+            torch_dtype=torch.bfloat16,
+            )
     
     # Load checkpoint if provided
     if model_path:
@@ -114,14 +132,15 @@ def compute_similarities(model, tokenizer, texts, device):
         similarities = F.cosine_similarity(embeddings[0], embeddings[1:], dim=1)
     return embeddings, similarities
 
-def main():
+def main(model_path=None):
     # Set device
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
     # Load both models and tokenizers
-    model_path = '/model/llm2clip/llm2vec/1b_full/supervised4/checkpoint-4896/pytorch_model.bin'
+    if model_path is None:
+        model_path = '/model/llm2clip/llm2vec/1b_full/supervised4/checkpoint-4896/pytorch_model.bin'
     llm2vec4cxr_model, llm2vec4cxr_tokenizer = load_model(model_path=model_path)
-    baseline_model, baseline_tokenizer = load_model(model_path=None)
+    baseline_model, baseline_tokenizer = load_model()
     
     # Move models to device and set precision
     llm2vec4cxr_model = llm2vec4cxr_model.to(device).to(torch.bfloat16)
@@ -132,7 +151,7 @@ def main():
     # Define input text and comparison options
     separator = '!@#$%^&*()'
     instruction = 'Determine the change or the status of the pleural effusion.; '
-    report = 'There has been some interval increase in the left-sided effusion. There continues to be volume loss at both bases. The right-sided PICC line tip is in the distal SVC.'
+    report = 'There is a small increase in the left-sided effusion. There continues to be volume loss at both bases. The right-sided PICC line tip is in the distal SVC.'
     text = instruction + separator + report
     
     comparison_options = [
@@ -140,6 +159,7 @@ def main():
         'Pleural effusion',
         'Effusion is seen in the right',
         'Effusion is seen in the left',
+        'Costophrenic angle is blunting',
         'Pleural effusion is improving',
         'Pleural effusion is stable',
         'Pleural effusion is worsening'
@@ -168,5 +188,8 @@ def main():
     print("="*75)
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description='Run LLM2Vec model comparison')
+    parser.add_argument('--model_path', type=str, help='Path to the model checkpoint', default=None)
+    args = parser.parse_args()
+    main(model_path=args.model_path)
     

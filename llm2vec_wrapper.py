@@ -14,6 +14,14 @@ class LLM2VecWrapper(LLM2Vec):
     def __init__(self, *args, **kwargs):
         super(LLM2VecWrapper, self).__init__(*args, **kwargs)
 
+    def prepare_for_tokenization(self, text):
+        text = (
+            "<|start_header_id|>user<|end_header_id|>\n\n"
+            + text.strip()
+            + "<|eot_id|>"
+        )
+        return text
+
     @classmethod
     def from_pretrained(
         cls,
