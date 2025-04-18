@@ -138,6 +138,8 @@ def main():
     comparison_options = [
         'No pleural effusion',
         'Pleural effusion',
+        'Effusion is seen in the right',
+        'Effusion is seen in the left',
         'Pleural effusion is improving',
         'Pleural effusion is stable',
         'Pleural effusion is worsening'
