@@ -159,7 +159,9 @@ def main(model_path=None):
         'Pleural effusion',
         'Effusion is seen in the right',
         'Effusion is seen in the left',
-        'Costophrenic angle is blunting',
+        'Costophrenic angle is blunting', #Similar
+        'PE is found in the left', #Abbreviation
+        'Eff. is seen in the left', #Abbreviation
         'Pleural effusion is improving',
         'Pleural effusion is stable',
         'Pleural effusion is worsening'
