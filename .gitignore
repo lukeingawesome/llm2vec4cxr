@@ -1,0 +1,29 @@
+# Ignore CSV files
+*.csv
+
+# Ignore Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Ignore distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Ignore virtual environments
+venv/
+env/
+.env/
+
+# Ignore IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Ignore Jupyter Notebook
+.ipynb_checkpoints
+
+# Ignore logs
+*.log 
