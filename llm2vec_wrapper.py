@@ -6,6 +6,7 @@ from transformers import (
     AutoTokenizer,
 
 )
+import torch
 import logging
 import json
 import os
@@ -148,6 +149,107 @@ class LLM2VecWrapper(LLM2Vec):
             embeddings = self(tokenized)
         
         return embeddings
+
+    def encode_with_separator(self, texts, device=None, max_length=None, separator='!@#$%^&*()'):
+        """
+        Encode texts with special separator-based handling for instruction/text pairs.
+        
+        Args:
+            texts (list): List of texts to encode (with separator for instruction/text pairs)
+            device: Device to run on (auto-detect if None)
+            max_length: Maximum sequence length (use model default if None)
+            separator: Separator string for instruction/text pairs
+        
+        Returns:
+            torch.Tensor: Embeddings for the texts
+        """
+        if device is None:
+            device = next(self.parameters()).device
+        if max_length is None:
+            max_length = 512
+            
+        # Ensure model is on the right device
+        self = self.to(device)
+        
+        # Process texts with separator
+        texts_2 = []
+        original_texts = []
+        
+        for text in texts:
+            parts = text.split(separator)
+            texts_2.append(parts[1] if len(parts) > 1 else "")
+            original_texts.append("".join(parts))
+
+        # Tokenize original texts
+        tokenized = self.tokenizer(
+            original_texts,
+            return_tensors="pt",
+            padding=True,
+            truncation=True,
+            max_length=max_length,
+        )
+        
+        # Create embedding masks
+        embed_mask = None
+        for t_i, t in enumerate(texts_2):
+            ids = self.tokenizer(
+                [t],
+                return_tensors="pt",
+                padding=True,
+                truncation=True,
+                max_length=max_length,
+                add_special_tokens=False,
+            )
+            
+            e_m = torch.zeros_like(tokenized["attention_mask"][t_i])
+            if len(ids["input_ids"][0]) > 0:
+                e_m[-len(ids["input_ids"][0]):] = torch.ones(len(ids["input_ids"][0]))
+                
+            if embed_mask is None:
+                embed_mask = e_m.unsqueeze(0)
+            else:
+                embed_mask = torch.cat((embed_mask, e_m.unsqueeze(0)), dim=0)
+
+        tokenized["embed_mask"] = embed_mask
+        
+        # Move to device and compute embeddings
+        tokenized = {k: v.to(device) for k, v in tokenized.items()}
+        tokenized = {k: v.to(self.model.dtype) if v.dtype.is_floating_point else v 
+                    for k, v in tokenized.items()}
+        
+        with torch.no_grad():
+            embeddings = self(tokenized)
+            
+        return embeddings
+
+    def compute_similarities(self, query_text, candidate_texts, device=None, separator='!@#$%^&*()'):
+        """
+        Compute similarity scores between a query text and candidate texts.
+        
+        Args:
+            query_text (str): The query text (with separator for instruction/text pairs)
+            candidate_texts (list): List of candidate texts to compare against
+            device: Device to run on (auto-detect if None)
+            separator: Separator string for instruction/text pairs
+        
+        Returns:
+            torch.Tensor: Similarity scores for each candidate
+        """
+        import torch.nn.functional as F
+        
+        if device is None:
+            device = next(self.parameters()).device
+            
+        # Combine query and candidates
+        all_texts = [query_text] + candidate_texts
+        
+        # Get embeddings
+        embeddings = self.encode_with_separator(all_texts, device=device, separator=separator)
+        
+        # Compute similarities between query (first embedding) and candidates
+        similarities = F.cosine_similarity(embeddings[0], embeddings[1:], dim=1)
+        
+        return similarities
 
     def _load_latent_attention_weights(self, model_path, use_safetensors=True):
         """
