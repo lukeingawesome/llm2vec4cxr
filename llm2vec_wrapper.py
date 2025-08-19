@@ -47,11 +47,17 @@ class LLM2VecWrapper(LLM2Vec):
         # Add embed_mask (same as attention_mask for simple text encoding)
         inputs["embed_mask"] = inputs["attention_mask"].clone()
         
-        # Move to same device as model if available
+        # Move to same device as model and ensure proper dtype
+        import torch
         if hasattr(self, 'device') and self.device is not None:
             inputs = {k: v.to(self.device) for k, v in inputs.items()}
         
-        import torch
+        # Ensure proper dtype for floating point tensors
+        model_dtype = next(self.parameters()).dtype
+        for key in inputs:
+            if inputs[key].dtype.is_floating_point:
+                inputs[key] = inputs[key].to(model_dtype)
+        
         with torch.no_grad():
             embeddings = self(inputs)
         
@@ -129,11 +135,17 @@ class LLM2VecWrapper(LLM2Vec):
         """
         tokenized = self.tokenize_with_separator(texts, max_length, separator)
         
-        # Move to same device as model if available
+        # Move to same device as model and ensure proper dtype
+        import torch
         if hasattr(self, 'device') and self.device is not None:
             tokenized = {k: v.to(self.device) for k, v in tokenized.items()}
         
-        import torch
+        # Ensure proper dtype for floating point tensors
+        model_dtype = next(self.parameters()).dtype
+        for key in tokenized:
+            if tokenized[key].dtype.is_floating_point:
+                tokenized[key] = tokenized[key].to(model_dtype)
+        
         with torch.no_grad():
             embeddings = self(tokenized)
         
