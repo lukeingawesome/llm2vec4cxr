@@ -149,6 +149,75 @@ class LLM2VecWrapper(LLM2Vec):
         
         return embeddings
 
+    def _load_latent_attention_weights(self, model_path, use_safetensors=True):
+        """
+        Automatically load latent attention weights from model files.
+        
+        Args:
+            model_path: Path to model (local directory or HuggingFace repo)
+            use_safetensors: Whether to use safetensors format
+        """
+        import os
+        
+        if os.path.isdir(model_path):
+            # Local directory - try pytorch_model.bin first
+            pytorch_model_path = os.path.join(model_path, "pytorch_model.bin")
+            if os.path.exists(pytorch_model_path):
+                print(f"Loading latent attention weights from {pytorch_model_path}")
+                try:
+                    import torch
+                    state_dict = torch.load(pytorch_model_path, weights_only=True)
+                    latent_attn_weights = {k: v for k, v in state_dict.items() if k.startswith('latent_attn.')}
+                    
+                    if latent_attn_weights:
+                        missing_keys, unexpected_keys = self.latent_attn.load_state_dict(
+                            {k.replace('latent_attn.', ''): v for k, v in latent_attn_weights.items()},
+                            strict=False
+                        )
+                        if not missing_keys and not unexpected_keys:
+                            print(f"✅ Successfully loaded {len(latent_attn_weights)} latent attention weights")
+                        else:
+                            print(f"⚠️ Partial loading: missing={missing_keys}, unexpected={unexpected_keys}")
+                    else:
+                        print("⚠️ No latent attention weights found in the model file")
+                except Exception as e:
+                    print(f"❌ Error loading latent attention weights: {e}")
+        else:
+            # HuggingFace repository - load from safetensors
+            if use_safetensors:
+                print("Loading latent attention weights from HuggingFace safetensors...")
+                try:
+                    from safetensors.torch import load_file
+                    from huggingface_hub import hf_hub_download
+                    
+                    # Download the safetensors file
+                    safetensors_path = hf_hub_download(repo_id=model_path, filename="model.safetensors")
+                    
+                    # Load weights from safetensors
+                    safetensors_weights = load_file(safetensors_path)
+                    
+                    # Extract latent attention weights
+                    latent_attn_weights = {k: v for k, v in safetensors_weights.items() if k.startswith('latent_attn.')}
+                    
+                    if latent_attn_weights:
+                        print(f"Found {len(latent_attn_weights)} latent attention weights in safetensors")
+                        
+                        # Load the weights into the latent attention module
+                        missing_keys, unexpected_keys = self.latent_attn.load_state_dict(
+                            {k.replace('latent_attn.', ''): v for k, v in latent_attn_weights.items()},
+                            strict=False
+                        )
+                        
+                        if not missing_keys and not unexpected_keys:
+                            print(f"✅ Successfully loaded {len(latent_attn_weights)} latent attention weights from safetensors")
+                        else:
+                            print(f"⚠️ Partial loading: missing={missing_keys}, unexpected={unexpected_keys}")
+                    else:
+                        print("⚠️ No latent attention weights found in safetensors file")
+                        
+                except Exception as e:
+                    print(f"❌ Error loading latent attention weights from safetensors: {e}")
+
     @classmethod
     def from_pretrained(
         cls,
@@ -237,6 +306,13 @@ class LLM2VecWrapper(LLM2Vec):
             config[key] = value
 
         llm2vec_model = cls(model=model, tokenizer=tokenizer, **config)
+        
+        # Auto-load latent attention weights if using latent_attention pooling
+        if (hasattr(llm2vec_model, 'latent_attn') and 
+            llm2vec_model.latent_attn is not None and 
+            llm2vec_model.pooling_mode == "latent_attention"):
+            
+            llm2vec_model._load_latent_attention_weights(base_model_name_or_path, kwargs.get('use_safetensors', True))
         
         # Ensure the entire model is converted to the requested dtype
         if 'torch_dtype' in kwargs and kwargs['torch_dtype'] is not None:

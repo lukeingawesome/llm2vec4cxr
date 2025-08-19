@@ -27,3 +27,6 @@ env/
 
 # Ignore logs
 *.log 
+
+# Ignore notebook files
+*.ipynb
