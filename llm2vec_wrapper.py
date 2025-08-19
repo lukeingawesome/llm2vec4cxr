@@ -59,8 +59,8 @@ class LLM2VecWrapper(LLM2Vec):
         
         # Move to same device as model 
         import torch
-        if hasattr(self, 'device') and self.device is not None:
-            inputs = {k: v.to(self.device) for k, v in inputs.items()}
+        model_device = next(self.parameters()).device
+        inputs = {k: v.to(model_device) for k, v in inputs.items()}
         
         with torch.no_grad():
             embeddings = self(inputs)
@@ -141,8 +141,8 @@ class LLM2VecWrapper(LLM2Vec):
         
         # Move to same device as model
         import torch
-        if hasattr(self, 'device') and self.device is not None:
-            tokenized = {k: v.to(self.device) for k, v in tokenized.items()}
+        model_device = next(self.parameters()).device
+        tokenized = {k: v.to(model_device) for k, v in tokenized.items()}
         
         with torch.no_grad():
             embeddings = self(tokenized)
