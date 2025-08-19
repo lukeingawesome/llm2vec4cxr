@@ -21,6 +21,123 @@ class LLM2VecWrapper(LLM2Vec):
             + "<|eot_id|>"
         )
         return text
+    
+    def encode_text(self, text, max_length=None):
+        """
+        Encode text to embeddings with proper embed_mask handling.
+        
+        Args:
+            text (str or list): Text(s) to encode
+            max_length (int, optional): Maximum sequence length
+        
+        Returns:
+            torch.Tensor: Text embeddings
+        """
+        if max_length is None:
+            max_length = getattr(self, 'max_length', 512)
+        
+        inputs = self.tokenizer(
+            text, 
+            return_tensors="pt", 
+            padding=True, 
+            truncation=True, 
+            max_length=max_length
+        )
+        
+        # Add embed_mask (same as attention_mask for simple text encoding)
+        inputs["embed_mask"] = inputs["attention_mask"].clone()
+        
+        # Move to same device as model if available
+        if hasattr(self, 'device') and self.device is not None:
+            inputs = {k: v.to(self.device) for k, v in inputs.items()}
+        
+        import torch
+        with torch.no_grad():
+            embeddings = self(inputs)
+        
+        return embeddings
+    
+    def tokenize_with_separator(self, texts, max_length=None, separator='!@#$%^&*()'):
+        """
+        Tokenize texts with special handling for separator-based splitting.
+        This is useful for instruction-following tasks.
+        
+        Args:
+            texts (list): List of texts to tokenize
+            max_length (int, optional): Maximum sequence length  
+            separator (str): Separator to split instruction from text
+        
+        Returns:
+            dict: Tokenized inputs with attention masks and embed masks
+        """
+        if max_length is None:
+            max_length = getattr(self, 'max_length', 512)
+            
+        texts_2 = []
+        original_texts = []
+        
+        for text in texts:
+            parts = text.split(separator)
+            texts_2.append(parts[1] if len(parts) > 1 else "")
+            original_texts.append("".join(parts))
+
+        # Tokenize original texts
+        tokenized = self.tokenizer(
+            original_texts,
+            return_tensors="pt",
+            padding=True,
+            truncation=True,
+            max_length=max_length,
+        )
+        
+        # Create embedding masks for the separated parts
+        import torch
+        embed_mask = None
+        for t_i, t in enumerate(texts_2):
+            ids = self.tokenizer(
+                [t],
+                return_tensors="pt",
+                padding=True,
+                truncation=True,
+                max_length=max_length,
+                add_special_tokens=False,
+            )
+            
+            e_m = torch.zeros_like(tokenized["attention_mask"][t_i])
+            if len(ids["input_ids"][0]) > 0:
+                e_m[-len(ids["input_ids"][0]):] = torch.ones(len(ids["input_ids"][0]))
+                
+            if embed_mask is None:
+                embed_mask = e_m.unsqueeze(0)
+            else:
+                embed_mask = torch.cat((embed_mask, e_m.unsqueeze(0)), dim=0)
+
+        tokenized["embed_mask"] = embed_mask
+        return tokenized
+    
+    def encode_with_instruction(self, texts, max_length=None, separator='!@#$%^&*()'):
+        """
+        Encode texts with instruction-following using separator-based processing.
+        
+        Args:
+            texts (list): List of texts with instructions separated by separator
+            max_length (int, optional): Maximum sequence length
+            separator (str): Separator between instruction and text
+        
+        Returns:
+            torch.Tensor: Text embeddings
+        """
+        tokenized = self.tokenize_with_separator(texts, max_length, separator)
+        
+        # Move to same device as model if available
+        if hasattr(self, 'device') and self.device is not None:
+            tokenized = {k: v.to(self.device) for k, v in tokenized.items()}
+        
+        import torch
+        with torch.no_grad():
+            embeddings = self(tokenized)
+        
+        return embeddings
 
     @classmethod
     def from_pretrained(
