@@ -13,6 +13,16 @@ logger = logging.getLogger(__name__)
 class LLM2VecWrapper(LLM2Vec):
     def __init__(self, *args, **kwargs):
         super(LLM2VecWrapper, self).__init__(*args, **kwargs)
+    
+    def to(self, device_or_dtype):
+        """Override to method to ensure all modules are properly moved."""
+        result = super().to(device_or_dtype)
+        
+        # Ensure latent attention pooling is also moved
+        if hasattr(result, 'latent_attn') and result.latent_attn is not None:
+            result.latent_attn = result.latent_attn.to(device_or_dtype)
+        
+        return result
 
     def prepare_for_tokenization(self, text):
         text = (
@@ -47,16 +57,10 @@ class LLM2VecWrapper(LLM2Vec):
         # Add embed_mask (same as attention_mask for simple text encoding)
         inputs["embed_mask"] = inputs["attention_mask"].clone()
         
-        # Move to same device as model and ensure proper dtype
+        # Move to same device as model 
         import torch
         if hasattr(self, 'device') and self.device is not None:
             inputs = {k: v.to(self.device) for k, v in inputs.items()}
-        
-        # Ensure proper dtype for floating point tensors
-        model_dtype = next(self.parameters()).dtype
-        for key in inputs:
-            if inputs[key].dtype.is_floating_point:
-                inputs[key] = inputs[key].to(model_dtype)
         
         with torch.no_grad():
             embeddings = self(inputs)
@@ -135,16 +139,10 @@ class LLM2VecWrapper(LLM2Vec):
         """
         tokenized = self.tokenize_with_separator(texts, max_length, separator)
         
-        # Move to same device as model and ensure proper dtype
+        # Move to same device as model
         import torch
         if hasattr(self, 'device') and self.device is not None:
             tokenized = {k: v.to(self.device) for k, v in tokenized.items()}
-        
-        # Ensure proper dtype for floating point tensors
-        model_dtype = next(self.parameters()).dtype
-        for key in tokenized:
-            if tokenized[key].dtype.is_floating_point:
-                tokenized[key] = tokenized[key].to(model_dtype)
         
         with torch.no_grad():
             embeddings = self(tokenized)
@@ -238,4 +236,10 @@ class LLM2VecWrapper(LLM2Vec):
         for key, value in encoder_args.items():
             config[key] = value
 
-        return cls(model=model, tokenizer=tokenizer, **config)
+        llm2vec_model = cls(model=model, tokenizer=tokenizer, **config)
+        
+        # Ensure the entire model is converted to the requested dtype
+        if 'torch_dtype' in kwargs and kwargs['torch_dtype'] is not None:
+            llm2vec_model = llm2vec_model.to(kwargs['torch_dtype'])
+        
+        return llm2vec_model
