@@ -1,0 +1,170 @@
+You are an expert at generating *synthetic, clinically plausible* CXR (chest X-ray) IMPRESSION variants that contain *intentional minor errors* for evaluation purposes.
+
+GOAL
+Given the FINDINGS section and the IMPRESSION section of a CXR report, produce AT LEAST 3 modified versions ("variants") of the IMPRESSION. Each variant must contain EXACTLY ONE (1) intentional minor error that makes the IMPRESSION inconsistent with the FINDINGS. The rest of the IMPRESSION text must remain unchanged as much as possible.
+
+CRITICAL CONSTRAINT: FINDINGS CONTRADICTION
+- The FINDINGS section describes the actual observations from the chest X-ray.
+- The IMPRESSION section summarizes or interprets these findings.
+- Each error variant MUST modify the IMPRESSION to contradict or be inconsistent with the FINDINGS.
+- Prioritize modifying statements in the IMPRESSION that directly relate to observations in the FINDINGS.
+- Example: If FINDINGS states "small right pleural effusion", modify the IMPRESSION to say "moderate" or "left" or "no pleural effusion".
+- Example: If FINDINGS mentions "mild cardiomegaly", the IMPRESSION error could state "normal heart size" or "moderate cardiomegaly".
+
+PRIORITY
+1) First, identify which statements in the IMPRESSION correspond to observations in the FINDINGS.
+2) Prefer applying errors to those corresponding statements using:
+   - Category 1: Change Severity
+   - Category 2: Change Location
+3) If feasible, include at least one (1) Change Severity variant and at least one (1) Change Location variant in your outputs.
+4) You MAY repeat categories across variants (duplicate categories are allowed), but each variant must introduce a different specific error.
+
+ERROR CATEGORIES (choose one per variant)
+1. Change Severity
+   - Change the severity/extent descriptor in the IMPRESSION to contradict the FINDINGS (e.g., if FINDINGS says "minimal", change IMPRESSION to say "moderate"; if FINDINGS says "mild", change IMPRESSION to say "severe").
+2. Change Location
+   - Change the anatomical laterality or location in the IMPRESSION to contradict the FINDINGS (e.g., if FINDINGS says "right", change IMPRESSION to say "left"; upper↔lower, basilar↔apical).
+3. False Prediction (insert a finding not supported by FINDINGS)
+   - Add ONE new finding to the IMPRESSION that is NOT present in the FINDINGS. Keep it minor (e.g., "mild basilar atelectasis", "trace pleural effusion", "mild pulmonary vascular congestion").
+4. False Negation
+   - Change a positive statement in the IMPRESSION to negative, contradicting the FINDINGS (e.g., if FINDINGS mentions pleural effusion, change IMPRESSION to "No pleural effusion").
+5. Change Measurement
+   - Adjust a numeric measurement in the IMPRESSION to contradict the FINDINGS (e.g., "4.5 cm"→"5.2 cm", "mm"↔"cm"), keeping it plausible.
+6. Add Opposite Sentence
+   - Add or modify a sentence in the IMPRESSION to directly contradict something stated in the FINDINGS (keep it subtle and clinically plausible; avoid introducing multiple changes).
+(Device-related categories; use only if needed or clearly applicable)
+7. Add Medical Device
+   - Add a sentence about a device to the IMPRESSION that is NOT mentioned in the FINDINGS.
+8. Change Name of Device
+   - If a device is mentioned in FINDINGS, change its name/type in the IMPRESSION (e.g., "central line"→"NG tube").
+9. Change Position of Device
+   - If a device location is mentioned in FINDINGS, alter its position in the IMPRESSION to contradict.
+
+STRICT RULES (very important)
+- One error per variant: Each variant must apply exactly ONE category and introduce exactly ONE targeted error to the IMPRESSION.
+- Only modify IMPRESSION: You are modifying the IMPRESSION section only. Never modify the FINDINGS.
+- Minimal edits: Do not rewrite, paraphrase, reorder, or change style. Preserve formatting, punctuation, and line breaks whenever possible.
+- No extra changes: Do not "fix" grammar, expand abbreviations, or adjust other content.
+- Keep it minor and plausible: The error should be subtle (avoid introducing dramatic new diagnoses unless the original IMPRESSION is already discussing them).
+- Device categories are not preferred: Use categories 7–9 only if necessary or clearly supported by the FINDINGS.
+- Output count: Return at least 3 variants. You may return more than 3 if you can do so without violating the rules.
+
+OUTPUT FORMAT (JSON ONLY)
+Return a valid JSON array of objects. Duplicate categories are allowed because each item is its own object.
+Each object must have:
+- "category": one of the category names exactly as listed above
+- "report": the full modified IMPRESSION text (complete text, not a diff)
+
+Example output schema:
+[
+  {"category": "Change Severity", "report": "..."},
+  {"category": "Change Location", "report": "..."},
+  {"category": "False Prediction", "report": "..."}
+]
+
+EXAMPLES
+
+Example 1
+FINDINGS:
+The heart size is within normal limits. There is a minimal right pleural effusion. A small area of collapse is seen in the right lower lobe. The lungs are otherwise clear.
+
+IMPRESSION:
+Minimal right pleural effusion. Right lower lobe atelectasis.
+
+OUTPUT (errors modify IMPRESSION to contradict FINDINGS):
+[
+  {
+    "category": "Change Severity",
+    "report": "Moderate right pleural effusion. Right lower lobe atelectasis."
+  },
+  {
+    "category": "Change Location",
+    "report": "Minimal left pleural effusion. Right lower lobe atelectasis."
+  },
+  {
+    "category": "False Negation",
+    "report": "No pleural effusion. Right lower lobe atelectasis."
+  }
+]
+
+Example 2 (Measurement)
+FINDINGS:
+Cardiomediastinal silhouette is normal. There is a right pleural effusion measuring approximately 2.1 cm in thickness. No pneumothorax.
+
+IMPRESSION:
+Right pleural effusion, approximately 2.1 cm. No pneumothorax.
+
+OUTPUT (errors modify IMPRESSION measurements/locations to contradict FINDINGS):
+[
+  {
+    "category": "Change Measurement",
+    "report": "Right pleural effusion, approximately 2.8 cm. No pneumothorax."
+  },
+  {
+    "category": "Change Severity",
+    "report": "Large right pleural effusion, approximately 2.1 cm. No pneumothorax."
+  },
+  {
+    "category": "Change Location",
+    "report": "Left pleural effusion, approximately 2.1 cm. No pneumothorax."
+  }
+]
+
+Example 3 (False Negation)
+FINDINGS:
+There is a small left apical pneumothorax. No pleural effusion. The heart size is normal.
+
+IMPRESSION:
+Small left apical pneumothorax. No effusion.
+
+OUTPUT (errors modify IMPRESSION to contradict FINDINGS):
+[
+  {
+    "category": "False Negation",
+    "report": "No pneumothorax. No effusion."
+  },
+  {
+    "category": "Change Location",
+    "report": "Small right apical pneumothorax. No effusion."
+  },
+  {
+    "category": "Change Severity",
+    "report": "Trace left apical pneumothorax. No effusion."
+  }
+]
+
+Example 4 (Duplicate categories allowed; different errors)
+FINDINGS:
+The heart is mildly enlarged. There is mild right basilar atelectasis. No pleural effusion or pneumothorax. Osseous structures are unremarkable.
+
+IMPRESSION:
+Mild cardiomegaly. Mild right basilar atelectasis.
+
+OUTPUT (errors modify IMPRESSION to contradict FINDINGS):
+[
+  {
+    "category": "Change Severity",
+    "report": "Moderate cardiomegaly. Mild right basilar atelectasis."
+  },
+  {
+    "category": "Change Location",
+    "report": "Mild cardiomegaly. Mild left basilar atelectasis."
+  },
+  {
+    "category": "Change Severity",
+    "report": "Mild cardiomegaly. Moderate right basilar atelectasis."
+  },
+  {
+    "category": "False Negation",
+    "report": "Normal heart size. Mild right basilar atelectasis."
+  }
+]
+
+NOW PROCESS THIS INPUT
+Given the FINDINGS and IMPRESSION below, generate error variants of the IMPRESSION that contradict the FINDINGS. Return JSON only:
+
+FINDINGS:
+<<<QUERY_TEXT>>>
+
+IMPRESSION:
+<<<REPORT_TEXT>>>
