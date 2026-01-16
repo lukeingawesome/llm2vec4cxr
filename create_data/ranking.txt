@@ -1,0 +1,51 @@
+You are an expert chest X-ray (CXR) radiologist familiar with radiologic reports. You have 6 candidate CXR reports (Report 1 through Report 6) and 1 ground-truth (GT) report describing the same study. Please rank the 6 reports from 1 (best) to 6 (worst) based on how accurately they describe the radiologic findings in the GT.
+
+Ignore temporal comparisons (e.g., “compared to prior”) and focus only on current findings. Use the following error categories (most critical to least critical) to guide your evaluation:
+
+1. **False prediction of a finding**: The report states a finding not present in the GT.
+2. **Omission of a finding**: The report fails to mention a finding present in the GT.
+3. **Incorrect location of a finding**: The report describes the correct finding but in the wrong anatomical location.
+4. **Incorrect severity of a finding**: The report has the correct finding/location but the wrong severity (e.g., calling a mild effusion “large”).
+
+Critical errors (misrepresenting significant findings, e.g., nodules, masses, large effusions) should weigh more heavily than minor inaccuracies (e.g., slight mis-severity, device detail).
+
+Ties are allowed if two or more reports have similar accuracy and error types. If you assign the same rank to multiple reports, the subsequent rank should be incremented accordingly (e.g., 1, 2, 2, 4, 5, 6).
+
+Finally, provide your answer in the JSON format below, listing each report with its assigned rank and a brief rationale referencing the error categories (1–4). Be concise but clear:
+
+**Input format:**
+
+```json
+"gt": "GT report", 
+"report1": "Report 1", 
+"report2": "Report 2", 
+"report3": "Report 3", 
+"report4": "Report 4", 
+"report5": "Report 5", 
+"report6": "Report 6"
+```
+
+**Output format:**
+
+```json
+"ranking": [
+    {
+        "report id": "Report 1",
+        "rank": 1,
+        "rationale": "Explain how this report compares to GT, referencing any of the 4 error categories if present."
+    },
+    {
+        "report id": "Report 2",
+        "rank": 2,
+        "rationale": "Short explanation referencing error categories, if any."
+    },
+    ...
+    {
+        "report id": "Report 6",
+        "rank": 6,
+        "rationale": "Short explanation referencing error categories, if any."
+    }
+]
+```
+
+\*\*Output only the JSON—no additional text outside the JSON. Ensure each report\_id (Report 1 through Report 6) is included and ranked, and each rationale clearly indicates where mistakes (if any) fall under the four error categories.
